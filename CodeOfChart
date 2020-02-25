@@ -1,0 +1,603 @@
+//import { tokenKey } from "@angular/core/src/view";
+
+//import { reject } from "q";
+
+/* To get a parameter from url which is coming through backend*/
+var params = {};
+var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
+	params[key] = value;
+});
+
+// var processInstaId=params.processInstanceId;
+// var token=params.token;
+// var strSlide=params.slideName;
+// var slideId=strSlide.split('_').join(" ");
+var processInstaId=params['processInstanceId'];
+var token=params['token'];
+var dataList=[];
+//console.log(params);
+/* to close the current Open tab in any browser*/
+// setTimeout(function(){
+// 	var ww = window.open(window.location, '_self'); 
+// 	ww.close(); }, 3000);
+
+/*Hit api again to bring chart data */
+
+//var showForPie=false;
+var responseDataOfUrl = null;// variable to get response
+$.ajax({
+ /* there would be a url from where u r going to take  data*/
+	url: "http://hexaview.com:8085/foliomax/rest/reporting/getSlideChartData?processInstanceId=" + processInstaId ,
+	dataType: 'json',
+	type: 'GET',
+	async: false,
+	beforeSend: function (xhr) {
+
+		xhr.setRequestHeader("Content-Type", 'application/json');
+		xhr.setRequestHeader("Accept", 'application/json');
+		xhr.setRequestHeader("X-Auth-Token", token);
+		//xhr.setRequestHeader("slideName",slideId);
+	},
+	//headers:'X-Auth-Token=asdasdasdads',
+	//data: params,
+	processData: false,
+	success: function (data) {
+		responseDataOfUrl = data;
+		var firstLoop = responseDataOfUrl.responseData.slideVsChartDataVO;
+		for (var k=0; k < firstLoop.length; k++){
+			firstLoop[k].slideCommonChartTypeDataVOList.forEach(element => {
+			  element['slideName']=firstLoop[k].slideName;
+			  dataList.push(element);
+			});
+		  }
+		  
+	},
+	error: function (jqXhr, textStatus, errorThrown) {
+		console.log(errorThrown);
+	}
+
+});
+
+//console.log(temp);
+
+
+        var lastIndex=dataList.length-1;
+	for(let j=0,p1 = Promise.resolve();j < dataList.length;j++) {
+		p1=p1.then(_=>
+			new Promise(resolve=>{
+			var chart = document.getElementById('chart');
+			var myChart = echarts.init(chart);
+			var myOption = setOptionValueForDifferentChart(j);
+			myChart.setOption(myOption);
+			let rPromise = checkIfChartPrepared(myChart,j);
+			rPromise.then(function(){
+                                if(j==lastIndex){
+				   window.close();
+                                   reslove();
+				}else{
+				   resolve();
+				}
+			  
+			});
+		}
+		));
+	}
+       //self.close();
+	
+function checkIfChartPrepared(myChart,y){
+	return new Promise((resolve,reject)=>{
+		myChart.on('finished', function () {
+			let cPromise =convertChartIntoImage(y);
+			cPromise.then(function(){
+				resolve("Success");
+			});
+		myChart.off('finished');
+		myChart.dispose();
+		});
+	});
+}
+
+
+
+
+/* function to prepare chart data*/
+
+function setOptionValueForDifferentChart( _j) {
+	var option = {
+		color:['#c23531','#2f4554', '#61a0a8', '#d48265', '#91c7ae','#749f83',  '#ca8622', '#bda29a','#6e7074', '#546570', '#c4ccd3'],
+		title: {
+			text: '',
+			left:''
+		},
+		tooltip: {
+			trigger: '',
+			axisPointer:{
+				type:''
+			}
+		},
+		legend: {
+			data: [],
+			icon:'',
+			itemHeight:14,
+			itemWidth:25,
+			orient:'horizontal',
+			right:'auto',
+			top:'auto'
+
+		},
+		grid:{
+			left:'10%',
+			right:'10%',
+			bottom:60,
+			containLabel:false
+		},
+		xAxis: {
+			type: '',
+			splitLine: {
+				show: true
+			},
+			axisTick:{
+				show:true
+			},
+			axisLine: {
+				show: true
+			},
+			data: [],
+			axisLabel:{
+				formatter:null
+
+			},
+			splitArea:{
+				show:true,
+				areaStyle:{
+					show:false,
+					color:['rgba(250,250,250,0.3)','rgba(200,200,200,0.3)']
+				}
+			}
+		},
+		yAxis: {
+			type: '',
+			name:'',
+			nameTextStyle:{
+                padding:[0,0,0,0]
+			},
+			axisTick:{
+				show:true
+			},
+			splitLine: {
+				show: true
+			},
+			axisLine: {
+				show: true
+			},
+			data: [],
+			axisLabel:{
+				formatter:null
+
+			},
+			splitArea:{
+				show:true,
+				areaStyle:{
+					show:false,
+					color:['rgba(250,250,250,0.3)','rgba(200,200,200,0.3)']
+				}
+			}
+		},
+		series: []
+	};
+	var chartType = dataList[_j].chartType;
+
+	if (chartType == "BarGraph") {
+		for (let k = 0; k < dataList[_j].slideCommonChartData.length; k++) {
+			var seriesObject = {};
+			if (dataList[_j].slideCommonChartData[k].isX_Category) {
+				option.color=dataList[_j].slideCommonChartData[k].color;
+				option.grid.left='5%';
+				option.grid.containLabel=true;
+				option.xAxis.type = 'category';
+				option.legend.icon='rect';
+				option.legend.itemHeight=6;
+				option.legend.itemWidth=6;
+				option.legend.data=dataList[_j].slideCommonChartData[k].legends;
+				option.xAxis.splitArea.show=false;
+				option.yAxis.splitArea.show=false;
+				option.xAxis.axisTick.show=false;
+				option.yAxis.axisTick.show=false;
+				option.xAxis.axisLine.show = false;
+				option.yAxis.axisLine.show = false;
+				option.yAxis.axisLabel.formatter='{value}%';
+				option.xAxis.data = dataList[_j].slideCommonChartData[k].xData;
+				option.yAxis.splitLine.show = false;
+				option.yAxis.type = 'value';
+				option.tooltip.trigger = 'axis';
+				seriesObject['type'] = 'bar';
+				seriesObject['data'] = dataList[_j].slideCommonChartData[k].yData;
+				option.series.push(seriesObject);
+
+			} else {
+				option.color=dataList[_j].slideCommonChartData[k].color;
+				option.grid.containLabel=true;
+				option.grid.left='5%';
+				option.yAxis.type = 'category';
+				option.xAxis.type = 'value';
+				option.legend.icon='rect';
+				option.legend.itemHeight=6;
+				option.legend.itemWidth=6;
+				option.xAxis.axisTick.show=false;
+				option.yAxis.axisTick.show=false;
+				option.xAxis.splitArea.show=false;
+				option.yAxis.splitArea.show=false;
+				option.xAxis.axisLine.show = false;
+				option.yAxis.axisLine.show = false;
+				option.xAxis.splitLine.show = false;
+				option.xAxis.axisLabel.formatter='{value}%';
+				option.yAxis.data = dataList[_j].slideCommonChartData[k].yData;
+				option.tooltip.trigger = 'axis';
+				seriesObject['type'] = 'bar';
+				seriesObject['data'] = dataList[_j].slideCommonChartData[k].xData;
+				option.series.push(seriesObject);
+			}
+
+		}
+		return option;
+	} else if (chartType == "LineGraph") {
+		for (let k = 0; k < dataList[_j].slideCommonChartData.length; k++) {
+			var seriesObject = {};
+			if (dataList[_j].slideCommonChartData[k].isX_Category) {
+				option.legend.icon='rect';
+				option.legend.itemHeight=4;
+				option.legend.itemWidth=45;
+				option.legend.orient='vertical';
+				option.legend.right='left';
+				option.legend.top='center';
+				option.grid.right='25%';
+				option.grid.containLabel=true;
+				option.color=dataList[_j].slideCommonChartData[k].color;
+				option.xAxis.type = 'category';
+				option.xAxis.data = dataList[_j].slideCommonChartData[k].xData;
+				option.xAxis.splitLine.show = false;
+				option.xAxis.splitArea.show=false;
+				option.xAxis.splitArea.areaStyle.show=false;
+				option.yAxis.splitArea.show=false;
+				option.yAxis.axisLabel.formatter='${value}';
+				option.yAxis.splitArea.areaStyle.show=false;
+				option.yAxis.type = 'value';
+				option.tooltip.trigger = 'axis';
+				seriesObject['type'] = 'line';
+				seriesObject['name']=dataList[_j].slideCommonChartData[k].legends[0];
+				option.legend.data.push(dataList[_j].slideCommonChartData[k].legends[0]);
+				seriesObject['showSymbol']=false;
+				seriesObject['data'] = dataList[_j].slideCommonChartData[k].yData;
+				seriesObject['color']=dataList[_j].slideCommonChartData[k].color[0];
+				option.series.push(seriesObject);
+
+			} else {
+				option.color=dataList[_j].slideCommonChartData[k].color;
+				option.legend.icon='rect';
+				option.legend.itemHeight=4;
+				option.legend.itemWidth=45;
+				option.legend.orient='vertical';
+				option.legend.right='left';
+				option.legend.top='center';
+				option.grid.right='25%';
+				option.grid.containLabel=true;
+				option.yAxis.type = 'category';
+				option.xAxis.type = 'value';
+				option.yAxis.splitLine.show = false;
+				option.yAxis.splitArea.show=false;
+				option.yAxis.splitArea.areaStyle.show=false;
+				option.xAxis.splitArea.show=false;
+				option.xAxis.splitArea.areaStyle.show=false;
+				option.xAxis.axisLabel.formatter='${value}';
+				option.yAxis.data = dataList[_j].slideCommonChartData[k].yData;
+				option.tooltip.trigger = 'axis';
+				seriesObject['type'] = 'line';
+				seriesObject['name']=dataList[_j].slideCommonChartData[k].legends[0];
+				option.legend.data.push(dataList[_j].slideCommonChartData[k].legends[0]);
+				seriesObject['showSymbol']=false;
+				seriesObject['data'] = dataList[_j].slideCommonChartData[k].xData;
+				seriesObject['color']=dataList[_j].slideCommonChartData[k].color[0];
+				option.series.push(seriesObject);
+			}
+
+		}
+		//console.log(option);
+		return option;
+	} else if (chartType == "FieldGraph") {
+		var  option2 = {
+
+			xAxis: {
+				type: 'value',
+				splitLine:{
+					show:false
+				},
+				axisTick:{
+					show:false
+				},
+				axisLine:{
+					show:false
+				},
+				axisLabel:{
+					formatter:"{value}%"
+				},
+				splitNumber:3,
+				name:"standard deviation (risk)",
+				nameLocation:'center',
+				nameGap:35,
+				nameTextStyle:{
+					color:'#00bfff',
+					fontSize:20
+				},
+				splitArea:{
+					show:true,
+					areaStyle:{
+						color:['#ADFF2F','#006400','#228B22']
+					}
+				}
+			},
+			yAxis: {
+				type: 'value',
+				splitLine:{
+					show:false
+				},
+				 axisTick:{
+					show:false
+				},
+				 axisLabel:{
+					formatter:"{value}%"
+				},
+				axisLine:{
+					show:false
+				},
+				name:"return",
+				nameLocation:'center',
+				nameGap:45,
+				nameTextStyle:{
+					color:'#00bfff',
+					fontSize:20
+				}
+			   
+			},
+			series: [{
+				symbol:'diamond',
+				symbolSize:10,
+				data: [],
+				type: 'line',
+				color:'#000080',
+			
+			}]
+		};
+		  for (let k = 0; k < this.dataList[_j].slideCommonChartData.length; k++) {
+			  var list_1=[];
+			  for (let m=0;m<this.dataList[_j].slideCommonChartData[k].xData.length;m++){
+				  var list_2=[];
+				  list_2.push(this.dataList[_j].slideCommonChartData[k].xData[m],this.dataList[_j].slideCommonChartData[k].yData[m])
+				  list_1.push(list_2);
+			  }
+			option2.series[0].data=list_1;
+			
+	
+		  }
+		  return option2;
+	} else if (chartType == "CandleGraph") {
+		 var listOfModelValues=[];
+		 var listOfPeriodDisplay=[];
+		 var candleResponse = this.dataList[_j].slideCandleStickChartData;
+		 listOfModelValues=candleResponse[0].modelValues;
+		 listOfPeriodDisplay=candleResponse[0].xValues;
+		 var k = 0;
+		 var listOfSeriesData=[];
+		 while (k < candleResponse[0].labels.length) {
+		   var listOFLabelsWiseData = [];
+		   for (let i = 0; i < listOfPeriodDisplay.length; i++) {
+			 var listOfStrategyData = [];
+			 listOfStrategyData.push(listOfModelValues[k].averageReturnList[i]);
+			 listOfStrategyData.push(listOfModelValues[k].bestReturnList[i]);
+			 listOfStrategyData.push(listOfModelValues[k].secondBestReturnList[i]);
+			 listOfStrategyData.push(listOfModelValues[k].secondWorstReturnList[i]);
+			 listOfStrategyData.push(listOfModelValues[k].worstReturnList[i]);
+			 listOFLabelsWiseData.push(listOfStrategyData);
+		   }
+		   listOfSeriesData.push(listOFLabelsWiseData);
+		   k = k + 1;
+		 }
+         
+		 var seriesData = [];
+		 for (let i = 0; i < listOfSeriesData.length; i++) {
+		   var seriesObject = {};
+		   seriesObject['name'] =candleResponse[0].labels[i];
+		   seriesObject['type'] = 'boxplot';
+		   seriesObject['data'] = listOfSeriesData[i];
+		   seriesData.push(seriesObject);
+		}
+		//option.color=candleResponse[0].color;
+	    var legendsForPie={
+			y:'',
+			data:'',
+			left:''
+
+		}
+		option.title.text= 'Range Of Returns ( % )';
+		option.title.left='center';
+		legendsForPie.y='90%';
+		legendsForPie.data=candleResponse[0].labels;
+		legendsForPie.left=true;
+		option['legend']=legendsForPie;
+		option.tooltip.trigger='item';
+		option.tooltip.axisPointer.type='shadow';
+		option.xAxis.type='category';
+		option.xAxis.data=candleResponse[0].xValues;
+		option.xAxis.splitArea.show=false;
+		option.yAxis.type='value';
+		option.yAxis.name='( Based on After Tax Returns )';
+		option.yAxis.nameTextStyle.padding=[0,0,0,60];
+		option.yAxis.splitLine.show=false;
+		option.series=seriesData;
+		return option;
+	} else if (chartType == "PieGraph") {
+		var option1={
+			title:{
+				text:'',
+				left:'',
+                                top:0,
+                                textStyle:{
+                                      fontSize:40     
+                                 }
+	
+			},
+			tooltip:{
+	
+			},
+	
+			series: []
+		  };
+		  var resultElement = this.dataList[_j].slideCommonChartData[0];
+		  // option.xAxis.axisLine.show = false;
+		  // option.yAxis.axisLine.show = false;
+		  //this.showForPie=true;
+		  var radius='100%';
+		  var labelLine = {
+			show: false
+		  }
+
+		  if(resultElement.title!=null){
+			   option1.title.text=resultElement.title;
+                           option1.title.left='center';
+                           radius='75%';
+                  }
+		  var seriesObjectForPie = {};
+		  var data = [];
+		  seriesObjectForPie['type'] = 'pie';
+		  seriesObjectForPie['radius'] = radius;
+		  seriesObjectForPie['center'] = ['50%', '50%']
+		  seriesObjectForPie['labelLine'] = labelLine;
+                  //seriesObjectForPie['label'] = label;
+	
+		  for (let k = 0; k < resultElement.color.length; k++) {
+			var multiDataObject = {
+			  value: '',
+			  itemStyle: {
+				// color: {
+                                //   type: 'radial',
+                                //   x: 0.5,
+                               //   y: 0.5,
+                               //   r: 0.5,
+                              //   colorStops: [{
+                               //     offset: 0, color: '#ffffff'
+                               //   }, {
+                              //     offset: 1, color: ''
+                             //   }],
+                            //   global: false
+
+                              // }
+                             color:''
+			  }
+			};
+			multiDataObject.value = resultElement.pieGraphData[k];
+			multiDataObject.itemStyle.color= resultElement.color[k];
+			data.push(multiDataObject);
+		  }
+		  seriesObjectForPie['data'] = data;
+		  option1.series.push(seriesObjectForPie);
+		  return option1;
+	} else {
+		return option;
+	}
+}
+
+/*provide a time period to prepare a chart after that creating an image */
+function convertChartIntoImage(_j) {
+	return new Promise((resolve,reject)=>{
+		
+
+	var chartImageName = dataList[_j].chartImgName;
+	var canvas = document.getElementsByTagName('canvas')[0];
+	var ctx = canvas.getContext('2d');
+	var img = new Image();
+	img.src = canvas.toDataURL("image/png");
+	var block = img.src.split(";");
+	var contentType = block[0].split(":")[1];
+	var realData = block[1].split(",")[1];
+	var blob = b64toBlob(realData, contentType);
+	//document.body.appendChild(img);
+	var fd = new FormData();
+	fd.append('slideName', dataList[_j].slideName);
+	fd.append('processInstanceId', processInstaId);
+	fd.append('extension', "png");
+	fd.append('chartList', blob, chartImageName);
+    var promise = uploadImageOnUrl(fd);
+	promise.then(function(){
+		resolve("Success");
+	})
+   })
+	
+
+
+}
+
+
+
+function uploadImageOnUrl(formData) {
+
+	//let formData = new FormData(document.getElementById("myAwesomeForm"));
+    return new Promise((resolve,reject)=>{
+		$.ajax({
+      /* there would be a url from where u r going to push data*/
+			url: "http://xxxxxx.com:8085/foliomax/rest/reporting/uploadChartImg?X-Auth-Token=" + token,
+			type: 'POST',
+			async: false,
+			data: formData,
+			contentType: 'multipart/form-data',
+			cache: false,
+			processData: false,
+			contentType: false,
+			// beforeSend: function (xhr) {
+			// 	xhr.setRequestHeader("X-Auth-Token", '1397501DFfjAmDpruqghYb');
+			// },
+			// headers: {
+			//	'X-Auth-Token': token
+			// },
+	
+			success: function (data) {
+				console.log("Successfully  Uploaded");
+				resolve("Successs");
+				//resolve("Successs");
+			},
+			error: function (jqXhr, textStatus, errorThrown) {
+				console.log(errorThrown);
+				
+			}
+	
+		});
+	})
+	
+	
+}
+
+
+/* Convert  Binary file encoded using base64 to Binary large Object(blob) which is useful to send large chunk of data*/
+
+function b64toBlob(b64Data, contentType, sliceSize = 512) {
+	contentType = contentType || '';
+	sliceSize = sliceSize || 512;
+
+	var byteCharacters = atob(b64Data);
+	var byteArrays = [];
+
+	for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+		var slice = byteCharacters.slice(offset, offset + sliceSize);
+
+		var byteNumbers = new Array(slice.length);
+		for (var i = 0; i < slice.length; i++) {
+			byteNumbers[i] = slice.charCodeAt(i);
+		}
+
+		var byteArray = new Uint8Array(byteNumbers);
+
+		byteArrays.push(byteArray);
+	}
+
+	var blob = new Blob(byteArrays, { type: contentType });
+	return blob;
+}
+	
